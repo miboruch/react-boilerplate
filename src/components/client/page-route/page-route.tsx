@@ -10,9 +10,5 @@ export const PageRoute: React.FC<RouteConfig> = ({ component: Component, showNav
 
   if (auth && !isAuthenticated) return <Navigate to={LOGIN_PAGE.path} />;
 
-  return (
-    <Page showNavigation={showNavigation}>
-      <Component />
-    </Page>
-  );
+  return <Page showNavigation={showNavigation}>{Component}</Page>;
 };

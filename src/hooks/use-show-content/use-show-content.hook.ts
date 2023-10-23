@@ -1,14 +1,27 @@
-import { ServerErrorType } from "server/server.types";
+import { useState } from "react";
+import { useDidUpdate } from "@better-hooks/lifecycle";
+
+import { ServerErrorType } from "api/api.types";
 import { UseShowContentReturnType } from "./use-show-content.types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useShowContent<T extends { data: any; loading: boolean; error: ServerErrorType | null }>(
+export function useShowContent<T extends { data: any; loading: boolean; error?: ServerErrorType | null }>(
   { data, loading, error }: T,
   permission?: boolean,
 ): UseShowContentReturnType {
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+
+  useDidUpdate(
+    () => {
+      setInitialLoading(false);
+    },
+    [loading],
+    true,
+  );
+
   function checkPayloadData() {
-    if (data?.data) {
-      return Boolean(data?.data.length) || Boolean(data?.data);
+    if (data?.results) {
+      return Boolean(data?.results.length);
     }
 
     if (Array.isArray(data)) {
@@ -19,14 +32,16 @@ export function useShowContent<T extends { data: any; loading: boolean; error: S
   }
 
   const hasPayload = checkPayloadData();
-  const hasPermission = permission !== false;
+  const isPermissionError = permission === false || error?.statusCode === 403;
+  const isLoading = loading || initialLoading;
 
-  const showLoader = loading;
-  const showContent = !error && !loading && hasPermission && hasPayload;
-  const showNoContent = Boolean(!loading && !error && data && !hasPayload && hasPermission);
-  const showError = Boolean(!loading && error && !hasPayload && hasPermission);
-  const showPagination = hasPayload && !showError && !showNoContent && hasPermission;
-  const showPermissionError = !hasPermission;
+  const showLoader = isLoading && !error;
+
+  const showContent = !error && !isLoading && !isPermissionError && hasPayload;
+  const showNoContent = Boolean(!isLoading && !error && data && !hasPayload && !isPermissionError);
+  const showError = Boolean(!isLoading && error && !hasPayload && !isPermissionError);
+  const showPagination = hasPayload && !showError && !showNoContent && !isPermissionError;
+  const showPermissionError = isPermissionError;
 
   return {
     showContent,

@@ -1,2 +1,2 @@
 export * from "./environment.config";
-export * from "./routes.config";
+export * from "config/routes.config";

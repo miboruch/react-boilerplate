@@ -1,70 +1,99 @@
 import { useState } from "react";
-import queryString from "query-string";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useDidMount, useDidUpdate } from "@better-typed/react-lifecycle-hooks";
+import { useDidUpdate } from "@better-hooks/lifecycle";
+import queryString from "query-string";
 
-import { options } from "./use-query-params.utils";
-import { isEmptyObject } from "utils";
-import { Nullable } from "types";
-import { QueryParamsReturn, QueryParams } from "./use-query-params.types";
+import { Nullable, NullableKeys } from "types";
 
-export const useQueryParams = <Query extends QueryParams>(possibleQueries?: Query): QueryParamsReturn<Query> => {
-  const location = useLocation();
+export type QueryParam = string | number | boolean | null | undefined;
+export type QueryParams = Record<string, QueryParam | QueryParam[]>;
+
+export type UseQueryParamsProps<Query> = { initialValues: Query };
+
+const options = {
+  arrayFormat: "comma",
+  skipEmptyString: true,
+} as queryString.ParseOptions;
+
+export const useQueryParams = <Query extends QueryParams>(config?: UseQueryParamsProps<Query>) => {
   const navigate = useNavigate();
+  const { initialValues } = config || {};
 
-  const currentQueries = (queryString.parse(location.search) || possibleQueries) as Query;
+  const location = useLocation();
 
-  const [query, setQuery] = useState<Query>(currentQueries);
+  const initialValue = (queryString.parse(location.search) || initialValues) as Query;
 
-  const updateQueryParams = (queryParams: QueryParams) => {
-    const stringifiedQueries = queryString.stringify(queryParams, options);
-
-    navigate(`${location.pathname}?${stringifiedQueries}`, { replace: true });
-  };
-
-  useDidMount(() => {
-    if (possibleQueries && !isEmptyObject(possibleQueries)) {
-      updateQueryParams(possibleQueries);
-      setQuery(possibleQueries);
-    }
-  });
+  const [query, setQuery] = useState<Query>(initialValue);
 
   useDidUpdate(
     () => {
-      const queries = queryString.parse(location.search) as Query;
-      setQuery(queries);
+      setQuery((prev) => ({ ...prev, ...queryString.parse(location.search) }));
     },
     [location.search],
     true,
   );
 
-  const setQueryParam = <Param extends keyof Query>(param: Param, value: Nullable<Query[Param]>) => {
-    const newQueries: QueryParams = { ...query, param: value };
+  function setQueryParams(value: Query) {
+    const currentQuery = queryString.parse(location.search);
+    const newQuery = { ...currentQuery, ...value };
 
-    updateQueryParams(newQueries);
+    const stringifiedValue = queryString.stringify(newQuery, options);
+    navigate(`${location.pathname}?${stringifiedValue}`, { replace: true });
+  }
+
+  function resetQueryParams() {
+    setQuery({} as Query);
+    navigate(`${location.pathname}`, { replace: true });
+  }
+
+  function setQueryParam<D extends keyof Query>(param: D, value: Nullable<Query[D]>) {
+    const newQuery = { ...query };
+
+    newQuery[param] = value as Query[D];
+
+    const stringifiedValue = queryString.stringify(newQuery, options);
+
+    navigate(`${location.pathname}?${stringifiedValue}`, { replace: true });
+  }
+
+  function updateQueryParams(values: Partial<Query>) {
+    const newQuery = { ...query, ...values };
+
+    const stringifiedValue = queryString.stringify(newQuery, options);
+    navigate(`${location.pathname}?${stringifiedValue}`, { replace: true });
+  }
+
+  function stringify(queryParams: Query | QueryParams): string {
+    const str = queryString.stringify(queryParams, options);
+    const mark = str ? "?" : "";
+    return mark + str;
+  }
+
+  const removeQuery = (key: string) => {
+    const prevQuery = { ...query };
+    delete prevQuery[key];
+
+    const queries = queryString.stringify(prevQuery, options);
+    navigate(`${location.pathname}?${queries}`, { replace: true });
   };
 
-  const setQueryParams = (queryParams: Query) => {
-    const newQueries: QueryParams = { ...queryParams };
+  const removeQueries = (keys: string[]) => {
+    const prevQuery = { ...query };
+    keys.forEach((key) => delete prevQuery[key]);
 
-    updateQueryParams(newQueries);
+    const queries = queryString.stringify(prevQuery, options);
+    navigate(`${location.pathname}?${queries}`, { replace: true });
   };
-
-  const deleteQueryParam = <Param extends keyof Query>(queryToRemove: Param) => {
-    const queries = { ...query };
-    delete queries[queryToRemove];
-    setQuery(queries);
-
-    updateQueryParams(queries);
-  };
-
-  const parsedQuery = queryString.parse(location.search);
 
   return {
-    query: location.search,
-    parsedQuery,
-    setQueryParam,
+    query: query as NullableKeys<Query>,
+    search: location.search,
+    stringify,
     setQueryParams,
-    deleteQueryParam,
+    setQueryParam,
+    updateQueryParams,
+    resetQueryParams,
+    removeQuery,
+    removeQueries,
   };
 };

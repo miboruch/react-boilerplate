@@ -2,7 +2,7 @@ import React from "react";
 
 export interface RouteConfig {
   path: string;
-  component: React.FC<unknown>;
+  component: React.ReactNode;
   name: string;
   auth: boolean;
   showNavigation: boolean;
